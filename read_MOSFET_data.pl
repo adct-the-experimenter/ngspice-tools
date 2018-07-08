@@ -64,7 +64,7 @@ for(@mosfets)
 	"\n \t vt:",$_->getThresholdVoltage(),
 	"\n \t Saturation:",$_->getSaturationFlag(),
 	"\n \t gm:",$_->getTransconductance_gm,
-	"\n \t vdsat:",$_->getSaturationFlag();
+	"\n \t vdsat:",$_->getOverdriveVoltage();
 }
 
 exit;
@@ -208,7 +208,7 @@ sub read_Results_For_MOS_data
 						$index = $index+1;#increment column index	
 					}
 					
-					say "$_: $hash{$_}" for(sort keys %hash);
+					#say "$_: $hash{$_}" for(sort keys %hash);
 				}
 				
 				$hash_count = keys %hash;
@@ -358,12 +358,10 @@ sub check_MOS_Saturation
 			if($sat1_flag & $sat2_flag)
 			{
 				$_->setSaturationFlag(1);
-				#say $_->getName(), " is in saturation.\n";
 			}
 			else
 			{
 				$_->setSaturationFlag(0);
-				#say $_->getName(), " is not in saturation.\n";
 			}
 		}
 		
@@ -387,12 +385,10 @@ sub check_MOS_Saturation
 			if($sat1_flag & $sat2_flag == 1)
 			{
 				$_->setSaturationFlag(1);
-				#say $_->getName(), " is in saturation.\n";
 			}
 			else
 			{
 				$_->setSaturationFlag(0);
-				#say $_->getName(), " is not in saturation.\n";
 			}
 		}
 	}
