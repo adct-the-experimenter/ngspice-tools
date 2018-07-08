@@ -5,17 +5,38 @@ use 5.010000; # use version 5.10
 use warnings;
 use strict;
 use Mosfet; #to use class Mosfet
+use Getopt::Long qw(GetOptions);
 
 
-my $filename_MOS = '/home/computerplayer/Circuits/kicad-projects/MOSFET-Fuzz/MOSFETS-To-Read.txt';
-my $filename_spice_results = '/home/computerplayer/Circuits/kicad-projects/MOSFET-Fuzz/results.txt';
 
-#Program reads transistors.txt for names of labels
-#of voltages at points in circuit. 
+#Program reads a file for names of MOSFETs 
 #These names will be used to find numerical data from results.txt
 #for these voltages in circuit.
 #Then the numerical data will be used to calculate overdrive voltage, gm, and 
 #saturation condition of transistors.  
+
+#***********************************
+#***** Get Needed File Paths *******
+#***********************************
+my $filename_MOS;
+my $filename_spice_results;
+
+my $mos_read_file_address;
+my $spice_results_file_address;
+GetOptions(
+    'mos_file=s' => \$mos_read_file_address,
+    'spice_results_file=s' => \$spice_results_file_address,
+) or die "Usage: $0 --mos_file  --results_file NAME\n";
+ 
+if ($mos_read_file_address) 
+{
+	$filename_MOS = $mos_read_file_address;
+}
+
+if ($spice_results_file_address) 
+{
+	$filename_spice_results = $spice_results_file_address;
+}
 
 #***********************************
 #***** Open MOSFETS-To-Read.txt ****
@@ -382,7 +403,7 @@ sub check_MOS_Saturation
 				$sat2_flag=1;
 			}
 			
-			if($sat1_flag & $sat2_flag == 1)
+			if($sat1_flag == 1 && $sat2_flag == 1)
 			{
 				$_->setSaturationFlag(1);
 			}
