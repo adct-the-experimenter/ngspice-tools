@@ -15,15 +15,34 @@ use Getopt::Long qw(GetOptions);
 #Then the numerical data will be used to calculate overdrive voltage, gm, and 
 #saturation condition of transistors.  
 
-#***********************************
-#***** Get Needed File Paths *******
-#***********************************
+#*****************************************************
+#***** Get Needed File Paths & Display Options *******
+#*****************************************************
 my $filename_MOS;
 my $filename_spice_results;
 
+#filepaths needed to extract MOSFET info
 my $mos_read_file_address;
 my $spice_results_file_address;
+
+#display options
+my $display_type; #bool to display type
+my $display_id; #bool to display id
+my $display_vgs; #bool to display vgs
+my $display_vds; #bool to display vds
+my $display_vt; #bool to display vt
+my $display_gm; #bool to display gm
+my $display_vdsat; #bool to display vdsat 
+my $display_sat; #bool to display saturation
 GetOptions(
+	'sat' => \$display_sat,
+	'type' => \$display_type,
+	'id' => \$display_id,
+	'vgs' => \$display_vgs,
+	'vds' => \$display_vds,
+	'vt' => \$display_vt,
+	'gm' => \$display_gm,
+	'vdsat' => \$display_vdsat,
     'mos_file=s' => \$mos_read_file_address,
     'spice_results_file=s' => \$spice_results_file_address,
 ) or die "Usage: $0 --mos_file  --results_file NAME\n";
@@ -33,10 +52,14 @@ if ($mos_read_file_address)
 	$filename_MOS = $mos_read_file_address;
 }
 
+die "missing --mos_file filename" unless ($mos_read_file_address); 
+
 if ($spice_results_file_address) 
 {
 	$filename_spice_results = $spice_results_file_address;
 }
+
+die "missing --spice_results_file filename" unless ($spice_results_file_address);
 
 #***********************************
 #***** Open MOSFETS-To-Read.txt ****
@@ -77,15 +100,15 @@ check_MOS_Saturation(@mosfets);
 
 for(@mosfets)
 {
-	say $_->getName(),
-	"\n \t type:",$_->getType(),
-	"\n \t id:",$_->getDrainCurrent(),
-	"\n \t vds:",$_->getVoltageDrainToSource(),
-	"\n \t vgs:",$_->getVoltageGateToSource(),
-	"\n \t vt:",$_->getThresholdVoltage(),
-	"\n \t Saturation:",$_->getSaturationFlag(),
-	"\n \t gm:",$_->getTransconductance_gm,
-	"\n \t vdsat:",$_->getOverdriveVoltage();
+	say $_->getName();
+	if($display_type){say "\t type:",$_->getType()}
+	if($display_id){say "\t id:",$_->getDrainCurrent()}
+	if($display_vds){say "\t vds:",$_->getVoltageDrainToSource()}
+	if($display_vgs){say "\t vgs:",$_->getVoltageGateToSource()}
+	if($display_vt){say "\t vt:",$_->getThresholdVoltage()}
+	if($display_sat){say "\t Saturation:",$_->getSaturationFlag();}
+	if($display_gm){say "\t gm:",$_->getTransconductance_gm}
+	if($display_vdsat){say "\t vdsat:",$_->getOverdriveVoltage()}
 }
 
 exit;
@@ -378,11 +401,11 @@ sub check_MOS_Saturation
 			
 			if($sat1_flag & $sat2_flag)
 			{
-				$_->setSaturationFlag(1);
+				$_->setSaturationFlag('Yes');
 			}
 			else
 			{
-				$_->setSaturationFlag(0);
+				$_->setSaturationFlag('No');
 			}
 		}
 		
@@ -405,11 +428,11 @@ sub check_MOS_Saturation
 			
 			if($sat1_flag == 1 && $sat2_flag == 1)
 			{
-				$_->setSaturationFlag(1);
+				$_->setSaturationFlag('Yes');
 			}
 			else
 			{
-				$_->setSaturationFlag(0);
+				$_->setSaturationFlag('No');
 			}
 		}
 	}
