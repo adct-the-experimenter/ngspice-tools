@@ -25,6 +25,7 @@ Options
 *  --vt option tells MOSFET reader to display MOSFET threshold voltage.
 *  --gm option tells MOSFET reader to display MOSFET transconductance gm.
 *  --vdsat option tells MOSFET reader to display MOSFET overdrive voltage vdsat.
+*  --model option tells MOSFET reader to display MOSFET model.
 
 Text file providing names of MOSFETs to read.
 ## MOSFETs-To-Read.txt
@@ -33,16 +34,10 @@ Text file providing names of MOSFETs to read.
 *it that way.
  
 MOSFET-Name: mq2
-	type: N
-	vt: 1
 	
 MOSFET-Name: mq3
-	type: N
-	vt: 1
 
 MOSFET-Name: mq4
-	type: P
-	vt: -2
 ```
 
 An example script to perform ngspice simulation, get results in text file, and read MOSFET data from ngspice simulation
