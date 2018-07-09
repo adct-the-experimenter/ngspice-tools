@@ -152,16 +152,8 @@ sub get_MOS_Read_Info
 		if($parameter =~ m/^MOSFET-Name/ && $value) 
 		{
 		    $found_name = $value;
-		}
-		
-		#if parameter is type, and value is defined
-		if($parameter =~ m/model$/ && $value)
-		{
-			$found_model_name = $value;
-			
-			$mos = Mosfet->new;
+		    $mos = Mosfet->new;
 			$mos->setName($found_name);
-			$mos->setModelName($found_model_name);
 		    push (@data,$mos);
 		}
 	}
@@ -189,6 +181,9 @@ sub read_Results_For_MOS_data
 	
 	my %hash_mosfet_models;
 	my $hash_mosfet_models_count;
+	
+	#hash made to read type and vto fin each column
+	my %read_hash;
 	
 	#use hash_mosfet_models to store mosfet model objects and match mosfet model name
 	#to mosfet model objects
@@ -236,9 +231,6 @@ sub read_Results_For_MOS_data
 			#if mos model block found
 			if($mosModelBlockFound == 1)
 			{
-				#hash made to read type and vto fin each column
-				my %read_hash;
-				
 				#if in model line
 				if($parameter_line =~ m/ +model/)
 				{
@@ -252,12 +244,11 @@ sub read_Results_For_MOS_data
 					 #set mosfet model names as keys to mosfet_model hash
 					 for(@stats)
 					 {
-						 
 						 my $this_model = MosfetModel->new;
 						 $this_model->setName($_);
 						 $hash_mosfet_models{$_} = $this_model;
-						 $read_hash{$_} = $index;
-						 say "At ", $_, " index is ", $read_hash{$_};
+						 $read_hash{$index} = $_;
+						 
 						 $index = $index+1;#increment column index
 					 }
 				}
@@ -270,43 +261,35 @@ sub read_Results_For_MOS_data
 					my $parameter;
 					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
 					
-					for(@mosfets)
+					my $index=1;
+					
+					for(@stats)
 					{
-						my $mos = $_;
-						say $mos->getModelName();
-						say $read_hash{$mos->getModelName()};
-						if($read_hash{$mos->getModelName()})
-						{
-							say $mos->getModelName()," has this type ", $stats[$read_hash{$mos->getModelName()}];
-						}
+						#index+1 needed because read_hash starts at 1
+						#set type
+						$hash_mosfet_models{$read_hash{$index}}->setType($_);
+						$index = $index + 1; #increment index
 					}
 				}
 				
-				#if in type line
+				#if in vto line
 				if($parameter_line =~ m/ +vto/)
 				{
 					#say $parameter_line;
 					my $parameter;
-					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
-				}
-
-			}
-			
-			#put mosfet model objects info into mosfets
-			for(@mosfets)
-			{
-				#if its model name is defined
-				if($_->getModelName())
-				{
-					#if its hash at model name is defined
-					if($hash_mosfet_models{$_->getModelName()})
+					($parameter, @stats) = split(/ {10,22}/, $parameter_line);
+					
+					my $index=1;
+					
+					for(@stats)
 					{
-						my $model = $hash_mosfet_models{$_->getModelName()};
-						
-						$_->setThresholdVoltage($model->getThresholdVoltage());
-						$_->setType($model->getType());
+						#index+1 needed because read_hash starts at 1
+						#set type
+						$hash_mosfet_models{$read_hash{$index}}->setThresholdVoltage($_);
+						$index = $index + 1; #increment index
 					}
 				}
+
 			}
 			
 			#if mos block found
@@ -348,6 +331,32 @@ sub read_Results_For_MOS_data
 				
 				$hash_mosfets_count = keys %hash_mosfets;
 				
+				#if in model line
+				if($parameter_line =~ m/ +model/ && $hash_mosfets_count >= 1)
+				{
+					my $parameter;
+					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
+					
+					for(@mosfets)
+					{
+						#if its model name is undefined
+						if(!$_->getModelName())
+						{
+							#if its hash at name is defined
+							if($hash_mosfets{$_->getName()})
+							{
+								#set model name
+								my $adjusted_index=$hash_mosfets{$_->getName()}-1;#need this so that can access stats[0]
+								$_->setModelName($stats[$adjusted_index]);
+								
+								#set mosfet type and vt threshold voltage based
+								#on model
+								$_->setType($hash_mosfet_models{$_->getModelName()}->getType());
+								$_->setThresholdVoltage($hash_mosfet_models{$_->getModelName()}->getThresholdVoltage());
+							}
+						}
+					}
+				}
 				
 				#if in id line
 				if($parameter_line =~ m/ +id/ && $hash_mosfets_count >= 1)
@@ -475,7 +484,7 @@ sub check_MOS_Saturation
 		my $sat2_flag=0;
 		
 		#for n-channel mosfets
-		if($_->getType() eq 'N')
+		if($_->getType() eq 'nmos')
 		{
 			#check if vds >= vgs-vt
 			if($_->getVoltageDrainToSource() >= 
@@ -502,7 +511,7 @@ sub check_MOS_Saturation
 		}
 		
 		#for p-channel mosfets
-		if($_->getType() eq 'P')
+		if($_->getType() eq 'pmos')
 		{
 			#check if vsd >= vsg-vt
 			if(-1*$_->getVoltageDrainToSource() >= 
