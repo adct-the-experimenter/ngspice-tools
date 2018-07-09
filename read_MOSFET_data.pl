@@ -1,11 +1,13 @@
 #!/usr/bin/env perl 
 package Mosfet;
+package MosfetModel;
 
 use 5.010000; # use version 5.10
 use warnings;
 use strict;
 use Mosfet; #to use class Mosfet
-use Getopt::Long qw(GetOptions);
+use MosfetModel; #to use class MosfetModel
+use Getopt::Long qw(GetOptions); #to use commandline options
 
 
 
@@ -34,6 +36,7 @@ my $display_vt; #bool to display vt
 my $display_gm; #bool to display gm
 my $display_vdsat; #bool to display vdsat 
 my $display_sat; #bool to display saturation
+my $display_model; #bool to display model
 GetOptions(
 	'sat' => \$display_sat,
 	'type' => \$display_type,
@@ -43,6 +46,7 @@ GetOptions(
 	'vt' => \$display_vt,
 	'gm' => \$display_gm,
 	'vdsat' => \$display_vdsat,
+	'model' => \$display_model,
     'mos_file=s' => \$mos_read_file_address,
     'spice_results_file=s' => \$spice_results_file_address,
 ) or die "Usage: $0 --mos_file  --results_file NAME\n";
@@ -79,6 +83,7 @@ open(my $filehandle_MOS, '<', $filename_MOS) or die "cannot open '$filename_MOS'
 #to array of MOSFET objects using get_MOS_data 
 my @mosfets = get_MOS_Read_Info($filehandle_MOS);
 
+
 #*********************************************
 #***** Read data from results.txt ************
 #*********************************************
@@ -101,14 +106,15 @@ check_MOS_Saturation(@mosfets);
 for(@mosfets)
 {
 	say $_->getName();
-	if($display_type){say "\t type:",$_->getType()}
-	if($display_id){say "\t id:",$_->getDrainCurrent()}
-	if($display_vds){say "\t vds:",$_->getVoltageDrainToSource()}
-	if($display_vgs){say "\t vgs:",$_->getVoltageGateToSource()}
-	if($display_vt){say "\t vt:",$_->getThresholdVoltage()}
+	if($display_type){say "\t type:",$_->getType();}
+	if($display_id){say "\t id:",$_->getDrainCurrent();}
+	if($display_vds){say "\t vds:",$_->getVoltageDrainToSource();}
+	if($display_vgs){say "\t vgs:",$_->getVoltageGateToSource();}
+	if($display_vt){say "\t vt:",$_->getThresholdVoltage();}
 	if($display_sat){say "\t Saturation:",$_->getSaturationFlag();}
-	if($display_gm){say "\t gm:",$_->getTransconductance_gm}
-	if($display_vdsat){say "\t vdsat:",$_->getOverdriveVoltage()}
+	if($display_gm){say "\t gm:",$_->getTransconductance_gm();}
+	if($display_vdsat){say "\t vdsat:",$_->getOverdriveVoltage();}
+	if($display_model){say "\t model:",$_->getModelName();}
 }
 
 exit;
@@ -120,8 +126,7 @@ sub get_MOS_Read_Info
   my @data;#array of data to return
 
   my $found_name = " "; #var to contain MOSFET name found
-  my $found_type; #var to contain MOSFET type found
-  my $found_vt; #var to contain MOSFET threshold
+  my $found_model_name; #var to contain name of MOSFET model that MOSFET has
   
   #read each line
   while(my $line = <$filehandle>) 
@@ -150,30 +155,14 @@ sub get_MOS_Read_Info
 		}
 		
 		#if parameter is type, and value is defined
-		if($parameter =~ m/type$/ && $value)
+		if($parameter =~ m/model$/ && $value)
 		{
-			$found_type = $value;
-			#if value is not N or P, raise exception and break loop
-			die "malformed $line. Must be N(Negative) or P(Positive)." unless($value =~ m/N|P$/);
-			die "MOSFET-Name parameter needs to be defined before type." unless ($found_name);
-		}
-		
-		#if parameter is vt, and value is defined
-		if($parameter =~ m/vt$/ && $value)
-		{
-			$found_vt = $value;
+			$found_model_name = $value;
 			
-			die "malformed $line. Value must be a real number with or without e exponent notation.\n" unless($value =~ m/^([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?$/);
-			die "type parameter needs to be defined before vt." unless ($found_type);
-			
-			#since last expected parameter
-			#create new mosfet and initialize values
 			$mos = Mosfet->new;
 			$mos->setName($found_name);
-			$mos->setType($found_type);
-			$mos->setThresholdVoltage($found_vt);
-			
-			push (@data,$mos);
+			$mos->setModelName($found_model_name);
+		    push (@data,$mos);
 		}
 	}
 	
@@ -190,13 +179,20 @@ sub read_Results_For_MOS_data
 	
 	my $parameter_line;
 	my @stats;
+	my $mosModelBlockFound=0; #var to indicate model specs. for mosfets found
 	my $mosBlockFound=0; #var to indicate mos block found
 	
-	#use hash to store and match mosfet label 
+	#use hash_mosfets to store and match mosfet label 
 	#and column index in stat
-	my %hash;
-	my $hash_count;
-				
+	my %hash_mosfets;
+	my $hash_mosfets_count;
+	
+	my %hash_mosfet_models;
+	my $hash_mosfet_models_count;
+	
+	#use hash_mosfet_models to store mosfet model objects and match mosfet model name
+	#to mosfet model objects
+	  			
 	#read each line
 	while(my $line = <$filehandle>) 
 	{
@@ -206,24 +202,119 @@ sub read_Results_For_MOS_data
 		#assign name and stats array according to split
 		my ($parameter_line, @stats) = split(/( :)+/, $line);
 		
-		#if parameter_line is undefined, and mosBlockFound is 1
-		if(!$parameter_line && $mosBlockFound == 1)
-		{
-			$mosBlockFound = 0; #set mos block found flag to off
-		}
+		
+		
 		if($parameter_line)
 		{
+			if(!$parameter_line)
+			{
+				$mosModelBlockFound=0;
+				$mosBlockFound=0;
+			}
+			
+			if($parameter_line =~ m/ Resistor/ || 
+				$parameter_line =~ m/  Capacitor:/)
+			{
+				$mosModelBlockFound=0;
+				$mosBlockFound=0;
+			}
+			
+			if($parameter_line =~ m/ Mos\d+ models +/ )
+			{
+				 #say "Mosfet models def. found! \n";
+				 $mosModelBlockFound=1;
+				 $mosBlockFound=0;
+			}
 			
 			if($parameter_line =~ m/ Mos\d+: +/ )
 			{
 				#say "Found MOS block! \n";
 				$mosBlockFound=1; #initialize mos block found var
+				$mosModelBlockFound=0;
+			}
+			
+			#if mos model block found
+			if($mosModelBlockFound == 1)
+			{
+				#hash made to read type and vto fin each column
+				my %read_hash;
+				
+				#if in model line
+				if($parameter_line =~ m/ +model/)
+				{
+					#index is 1 because a zero in if statement returns undefined for some reason.
+					my $index = 1;
+					
+					#say $parameter_line;
+					my $parameter;
+					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
+					 
+					 #set mosfet model names as keys to mosfet_model hash
+					 for(@stats)
+					 {
+						 
+						 my $this_model = MosfetModel->new;
+						 $this_model->setName($_);
+						 $hash_mosfet_models{$_} = $this_model;
+						 $read_hash{$_} = $index;
+						 say "At ", $_, " index is ", $read_hash{$_};
+						 $index = $index+1;#increment column index
+					 }
+				}
+				
+				
+				#if in type line
+				if($parameter_line =~ m/ +type/)
+				{
+					#say $parameter_line;
+					my $parameter;
+					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
+					
+					for(@mosfets)
+					{
+						my $mos = $_;
+						say $mos->getModelName();
+						say $read_hash{$mos->getModelName()};
+						if($read_hash{$mos->getModelName()})
+						{
+							say $mos->getModelName()," has this type ", $stats[$read_hash{$mos->getModelName()}];
+						}
+					}
+				}
+				
+				#if in type line
+				if($parameter_line =~ m/ +vto/)
+				{
+					#say $parameter_line;
+					my $parameter;
+					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
+				}
+
+			}
+			
+			#put mosfet model objects info into mosfets
+			for(@mosfets)
+			{
+				#if its model name is defined
+				if($_->getModelName())
+				{
+					#if its hash at model name is defined
+					if($hash_mosfet_models{$_->getModelName()})
+					{
+						my $model = $hash_mosfet_models{$_->getModelName()};
+						
+						$_->setThresholdVoltage($model->getThresholdVoltage());
+						$_->setType($model->getType());
+					}
+				}
 			}
 			
 			#if mos block found
 			if($mosBlockFound == 1)
 			{
+				
 				#if in device line
+				#hash_mosfets is initialized here
 				if($parameter_line =~ m/ +device/)
 				{
 					#say "$parameter_line found!\n";
@@ -245,20 +336,21 @@ sub read_Results_For_MOS_data
 							#if stat element and mosfet name strings match
 							if($this_stat eq $mos->getName())
 							{	
-								$hash{$mos->getName()} = $index;
+								$hash_mosfets{$mos->getName()} = $index;
 							} 
 						}
 						
 						$index = $index+1;#increment column index	
 					}
 					
-					#say "$_: $hash{$_}" for(sort keys %hash);
+					#say "$_: $hash_mosfets{$_}" for(sort keys %hash_mosfets);
 				}
 				
-				$hash_count = keys %hash;
+				$hash_mosfets_count = keys %hash_mosfets;
+				
 				
 				#if in id line
-				if($parameter_line =~ m/ +id/ && $hash_count >= 1)
+				if($parameter_line =~ m/ +id/ && $hash_mosfets_count >= 1)
 				{	
 					my $parameter;
 					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
@@ -269,9 +361,9 @@ sub read_Results_For_MOS_data
 						if(!$_->getDrainCurrent())
 						{
 							#if its hash at name is defined
-							if($hash{$_->getName()})
+							if($hash_mosfets{$_->getName()})
 							{
-								my $adjusted_index=$hash{$_->getName()}-1;#need this so that can access stats[0]
+								my $adjusted_index=$hash_mosfets{$_->getName()}-1;#need this so that can access stats[0]
 								$_->setDrainCurrent($stats[$adjusted_index]);
 							}
 						}
@@ -279,7 +371,7 @@ sub read_Results_For_MOS_data
 				}
 				
 				#if in vgs line
-				if($parameter_line =~ m/ +vgs/ && $hash_count >= 1)
+				if($parameter_line =~ m/ +vgs/ && $hash_mosfets_count >= 1)
 				{	
 					my $parameter;
 					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
@@ -290,9 +382,9 @@ sub read_Results_For_MOS_data
 						if(!$_->getVoltageGateToSource())
 						{
 							#if its hash at name is defined
-							if($hash{$_->getName()})
+							if($hash_mosfets{$_->getName()})
 							{
-								my $adjusted_index=$hash{$_->getName()}-1;#need this so that can access stats[0]
+								my $adjusted_index=$hash_mosfets{$_->getName()}-1;#need this so that can access stats[0]
 								$_->setVoltageGateToSource($stats[$adjusted_index]);
 							}
 						}
@@ -300,7 +392,7 @@ sub read_Results_For_MOS_data
 				}
 				
 				#if in vds line
-				if($parameter_line =~ m/ +vds/ && $hash_count >= 1)
+				if($parameter_line =~ m/ +vds/ && $hash_mosfets_count >= 1)
 				{	
 					my $parameter;
 					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
@@ -311,9 +403,9 @@ sub read_Results_For_MOS_data
 						if(!$_->getVoltageDrainToSource())
 						{
 							#if its hash at name is defined
-							if($hash{$_->getName()})
+							if($hash_mosfets{$_->getName()})
 							{
-								my $adjusted_index=$hash{$_->getName()}-1;#need this so that can access stats[0]
+								my $adjusted_index=$hash_mosfets{$_->getName()}-1;#need this so that can access stats[0]
 								$_->setVoltageDrainToSource($stats[$adjusted_index]);
 							}
 						}
@@ -321,7 +413,7 @@ sub read_Results_For_MOS_data
 				}
 				
 				#if in vdsat line
-				if($parameter_line =~ m/ +vdsat/ && $hash_count >= 1)
+				if($parameter_line =~ m/ +vdsat/ && $hash_mosfets_count >= 1)
 				{
 					my $parameter;
 					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
@@ -332,9 +424,9 @@ sub read_Results_For_MOS_data
 						if(!$_->getOverdriveVoltage())
 						{
 							#if its hash at name is defined
-							if($hash{$_->getName()})
+							if($hash_mosfets{$_->getName()})
 							{
-								my $adjusted_index=$hash{$_->getName()}-1;#need this so that can access stats[0]
+								my $adjusted_index=$hash_mosfets{$_->getName()}-1;#need this so that can access stats[0]
 								$_->setOverdriveVoltage($stats[$adjusted_index]);
 							}
 						}
@@ -342,7 +434,7 @@ sub read_Results_For_MOS_data
 				}
 				
 				#if in gm line
-				if($parameter_line =~ m/ +gm/ && $hash_count >= 1)
+				if($parameter_line =~ m/ +gm/ && $hash_mosfets_count >= 1)
 				{
 					my $parameter;
 					($parameter, @stats) = split(/ {10,18}/, $parameter_line);
@@ -353,9 +445,9 @@ sub read_Results_For_MOS_data
 						if(!$_->getTransconductance_gm())
 						{
 							#if its hash at name is defined
-							if($hash{$_->getName()})
+							if($hash_mosfets{$_->getName()})
 							{
-								my $adjusted_index=$hash{$_->getName()}-1;#need this so that can access stats[0]
+								my $adjusted_index=$hash_mosfets{$_->getName()}-1;#need this so that can access stats[0]
 								$_->setTransconductance_gm($stats[$adjusted_index]);
 							}
 						}

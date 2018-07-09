@@ -115,7 +115,6 @@ sub getVoltageDrainToSource
     return $self->{_vds};
 }
 
-#only set to 1 or 0
 sub setSaturationFlag
 {
 	my ( $self, $sat ) = @_;
@@ -123,12 +122,26 @@ sub setSaturationFlag
     return $self->{_sat};
 }
 
-#only check for 1 or 0
 sub getSaturationFlag
 {
 	my( $self ) = @_;
     return $self->{_sat};
 }
+
+#name of model used to indicate which model mosfet to read has
+sub setModelName
+{
+	my ( $self, $model ) = @_;
+    $self->{_model} = $model if defined($model);
+    return $self->{_model};
+}
+
+sub getModelName
+{
+	my( $self ) = @_;
+    return $self->{_model};
+}
+
 
 1;
 
