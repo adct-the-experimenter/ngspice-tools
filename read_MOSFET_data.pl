@@ -483,58 +483,63 @@ sub check_MOS_Saturation
 		my $sat1_flag=0;
 		my $sat2_flag=0;
 		
-		#for n-channel mosfets
-		if($_->getType() eq 'nmos')
+		#if these are all defined 
+		if($_->getVoltageDrainToSource() && $_->getVoltageGateToSource()
+			&& $_->getThresholdVoltage() && $_->getType())
 		{
-			#check if vds >= vgs-vt
-			if($_->getVoltageDrainToSource() >= 
-				$_->getVoltageGateToSource() - $_->getThresholdVoltage())
+			#for n-channel mosfets
+			if($_->getType() eq 'nmos')
 			{
-				$sat1_flag=1;
+				#check if vds >= vgs-vt
+				if($_->getVoltageDrainToSource() >= 
+					$_->getVoltageGateToSource() - $_->getThresholdVoltage())
+				{
+					$sat1_flag=1;
+				}
+				
+				#check if vgs >= vt
+				if($_->getVoltageGateToSource() >= 
+					$_->getThresholdVoltage())
+				{
+					$sat2_flag=1;
+				}
+				
+				if($sat1_flag & $sat2_flag)
+				{
+					$_->setSaturationFlag('Yes');
+				}
+				else
+				{
+					$_->setSaturationFlag('No');
+				}
 			}
 			
-			#check if vgs >= vt
-			if($_->getVoltageGateToSource() >= 
-				$_->getThresholdVoltage())
+			#for p-channel mosfets
+			if($_->getType() eq 'pmos')
 			{
-				$sat2_flag=1;
-			}
-			
-			if($sat1_flag & $sat2_flag)
-			{
-				$_->setSaturationFlag('Yes');
-			}
-			else
-			{
-				$_->setSaturationFlag('No');
-			}
-		}
-		
-		#for p-channel mosfets
-		if($_->getType() eq 'pmos')
-		{
-			#check if vsd >= vsg-vt
-			if(-1*$_->getVoltageDrainToSource() >= 
-				-1*$_->getVoltageGateToSource() - -1*$_->getThresholdVoltage())
-			{
-				$sat1_flag=1;
-			}
-			
-			#check if vsg >= vt
-			if(-1*$_->getVoltageGateToSource() >= 
-				-1*$_->getThresholdVoltage())
-			{
-				$sat2_flag=1;
-			}
-			
-			if($sat1_flag == 1 && $sat2_flag == 1)
-			{
-				$_->setSaturationFlag('Yes');
-			}
-			else
-			{
-				$_->setSaturationFlag('No');
-			}
+				#check if vsd >= vsg-|vt|
+				if(-1*$_->getVoltageDrainToSource() >= 
+					-1*$_->getVoltageGateToSource() - abs($_->getThresholdVoltage()) ) 
+				{
+					$sat1_flag=1;
+				}
+				
+				#check if vsg >= |vt|
+				if(-1*$_->getVoltageGateToSource() >= 
+					abs($_->getThresholdVoltage()) )
+				{
+					$sat2_flag=1;
+				}
+				
+				if($sat1_flag == 1 && $sat2_flag == 1)
+				{
+					$_->setSaturationFlag('Yes');
+				}
+				else
+				{
+					$_->setSaturationFlag('No');
+				}
+			}			
 		}
 	}
 }
