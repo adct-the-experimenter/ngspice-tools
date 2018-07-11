@@ -514,18 +514,20 @@ sub check_MOS_Saturation
 				}
 			}
 			
+			#IMPORTANT
+			#ngspice results treat vds and vgs of pmos as vsd and vsg respectively.
 			#for p-channel mosfets
 			if($_->getType() eq 'pmos')
 			{
 				#check if vsd >= vsg-|vt|
-				if(-1*$_->getVoltageDrainToSource() >= 
-					-1*$_->getVoltageGateToSource() - abs($_->getThresholdVoltage()) ) 
+				if($_->getVoltageDrainToSource() >= 
+					$_->getVoltageGateToSource() - abs($_->getThresholdVoltage()) ) 
 				{
 					$sat1_flag=1;
 				}
 				
 				#check if vsg >= |vt|
-				if(-1*$_->getVoltageGateToSource() >= 
+				if($_->getVoltageGateToSource() >= 
 					abs($_->getThresholdVoltage()) )
 				{
 					$sat2_flag=1;
