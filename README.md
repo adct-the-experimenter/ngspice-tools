@@ -32,11 +32,12 @@ Text file providing names of MOSFETs to read.
 ```
 *Put all names in lower case letters since spice reads
 *it that way.
- 
+*Do not put space after name!
+*Make sure name appears in ngpsice results text file and it is spelled correctly.
+*The format for specifying name of mosfet device. 
+*MOSFET-Name: space mq2
 MOSFET-Name: mq2
-	
 MOSFET-Name: mq3
-
 MOSFET-Name: mq4
 ```
 
